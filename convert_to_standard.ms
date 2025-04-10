@@ -8,33 +8,76 @@ fn convertToStandard = (
 
     -- 定义递归材质转换函数
     fn convertToStandardMaterial mat = (
-        if classof mat == Multimaterial then (
-            for i in 1 to mat.materialList.count do (
-                local subMat = mat.materialList[i]
-                if subMat != undefined do (
-                    mat.materialList[i] = convertToStandardMaterial subMat
+        case (classof mat) of (
+            Multimaterial: (
+                -- 处理多维子材质
+                for i in 1 to mat.materialList.count do (
+                    local subMat = mat.materialList[i]
+                    if subMat != undefined do (
+                        mat.materialList[i] = convertToStandardMaterial subMat
+                    )
                 )
-            )
-            mat
-        ) else (
-            if classof mat == StandardMaterial then (
                 mat
-            ) else (
+            )
+            
+            StandardMaterial: mat  -- 已经是标准材质则直接返回
+            
+            default: (
+                -- 创建新标准材质
                 local newMat = StandardMaterial()
                 newMat.name = mat.name + "_Std"
                 
-                -- 通用属性转换
-                try(newMat.diffuse = mat.diffuse)catch()
-                try(newMat.diffuse = mat.base_color)catch()
-                try(newMat.specularLevel = mat.specular_level)catch()
-                try(newMat.opacity = mat.opacity)catch()
+                -- 漫反射处理（优先处理贴图）
+                case (classof mat) of (
+                    PhysicalMaterial: (
+                        -- 转换物理材质
+                        if mat.base_color_map != undefined and classof mat.base_color_map == BitmapTexture do (
+                            newMat.diffuseMap = mat.base_color_map
+                        )
+                        newMat.diffuse = mat.base_color
+                    )
+                    
+                    VRayMtl: (
+                        -- 转换VRay材质
+                        if mat.texmap_diffuse != undefined and classof mat.texmap_diffuse == BitmapTexture do (
+                            newMat.diffuseMap = mat.texmap_diffuse
+                        )
+                        newMat.diffuse = mat.diffuse
+                    )
+                    
+                    Standardmaterial: ()  -- 已处理
+                    
+                    default: (
+                        -- 通用处理（适用于Arnold等大多数材质）
+                        try (
+                            if mat.diffuseMap != undefined and classof mat.diffuseMap == BitmapTexture do (
+                                newMat.diffuseMap = mat.diffuseMap
+                            )
+                            newMat.diffuse = mat.diffuse
+                        ) catch ()
+                    )
+                )
+                
+                -- 不透明度处理（带贴图支持）
+                try (
+                    if mat.opacity_map != undefined and classof mat.opacity_map == BitmapTexture do (
+                        newMat.opacityMap = mat.opacity_map
+                    )
+                    newMat.opacity = mat.opacity
+                ) catch ()
                 
                 -- 自发光处理
-                case (classof mat) of (
-                    PhysicalMaterial: try(newMat.selfIllumAmount = mat.luminance)catch()
-                    VRayMtl: try(newMat.selfIllumAmount = mat.selfIllumAmount)catch()
-                    default: try(newMat.selfIllumAmount = mat.selfIllumination)catch()
-                )
+                try (
+                    case (classof mat) of (
+                        PhysicalMaterial: newMat.selfIllumAmount = mat.luminance
+                        VRayMtl: newMat.selfIllumAmount = mat.selfIllumAmount
+                        default: newMat.selfIllumAmount = mat.selfIllumination
+                    )
+                ) catch ()
+                
+                -- 高光处理
+                try (newMat.specularLevel = mat.specular_level) catch ()
+                try (newMat.glossiness = mat.roughness) catch ()
                 
                 newMat
             )
@@ -50,7 +93,7 @@ fn convertToStandard = (
 )
 
 -- 创建主界面卷展栏
-rollout convertMaterialsRollout "材质转换工具" width:162 height:85
+rollout convertMaterialsRollout "材质转换工具" width:165 height:85
 (
     button btnConvert "转换为标准材质" pos:[10,10] width:142 height:28
     on btnConvert pressed do
@@ -62,5 +105,6 @@ rollout convertMaterialsRollout "材质转换工具" width:162 height:85
 -- 创建浮动窗口
 if convertMaterialsFloater != undefined do DestroyDialog convertMaterialsFloater
 -- 创建一个可调整大小的浮动窗口
-floater = newRolloutFloater "材质转换工具" 180 220 style:#(#style_resizing, #style_titlebar, #style_border, #style_sysmenu)
+floater = newRolloutFloater "材质转换工具" 280 220 style:#(#style_resizing, #style_titlebar, #style_border, #style_sysmenu)
+-- 设置窗口最小尺寸
 addRollout convertMaterialsRollout floater

@@ -3,28 +3,38 @@ fn convertToStandard = (
     -- 切换到扫描线渲染器
     renderers.current = Default_Scanline_Renderer()
 
-    -- 全局声明函数
+    -- 全局声明函数和材质缓存
     global convertToStandardMaterial
+    global materialCache = Dictionary 
 
     -- 定义递归材质转换函数
     fn convertToStandardMaterial mat = (
+        -- 检查材质是否已经在缓存中
+        if materialCache.hasKey mat.name do (
+            return materialCache[mat.name]
+        )
+
+        local newMat
         case (classof mat) of (
             Multimaterial: (
                 -- 处理多维子材质
+                newMat = Multimaterial name:mat.name
                 for i in 1 to mat.materialList.count do (
                     local subMat = mat.materialList[i]
                     if subMat != undefined do (
-                        mat.materialList[i] = convertToStandardMaterial subMat
+                        newMat.materialList[i] = convertToStandardMaterial subMat
                     )
                 )
-                mat
             )
             
-            StandardMaterial: mat  -- 已经是标准材质则直接返回
+            StandardMaterial: (
+                -- 已经是标准材质则直接返回
+                newMat = mat
+            )
             
             default: (
                 -- 创建新标准材质
-                local newMat = StandardMaterial()
+                newMat = StandardMaterial()
                 newMat.name = mat.name + "_Std"
                 
                 -- 漫反射处理（优先处理贴图）
@@ -78,10 +88,17 @@ fn convertToStandard = (
                 -- 高光处理
                 try (newMat.specularLevel = mat.specular_level) catch ()
                 try (newMat.glossiness = mat.roughness) catch ()
-                
-                newMat
             )
         )
+
+        -- 检查材质名称是否有效
+        if mat.name == undefined or mat.name == "" do (
+            mat.name = uniqueName "Material"
+        )
+        
+        -- 将新材质存入缓存
+        materialCache[mat.name] = newMat
+        return newMat
     )
 
     -- 处理所有对象

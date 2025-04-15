@@ -1,5 +1,6 @@
 -- 创建数组存储材质缓存
 materialCache = #()
+oldMaterialNames = #() -- 新增数组存储旧材质名称
 
 -- 切换到扫描线渲染器
 renderers.current = Default_Scanline_Renderer()
@@ -96,8 +97,19 @@ fn convertToStandardMaterial mat = (
             -- 高光处理
             try (newMat.specularLevel = mat.specular_level) catch ()
             try (newMat.glossiness = mat.roughness) catch ()
+
+            -- 凹凸贴图处理
+            try (
+                if mat.bump_map != undefined and classof mat.bump_map == BitmapTexture do (
+                    newMat.bumpMap = mat.bump_map
+                )
+                newMat.bumpAmount = mat.bump
+            ) catch ()
         )
     )
+
+    -- 将旧材质名称存入数组
+    append oldMaterialNames mat.name
 
     -- 将新材质存入缓存
     append materialCache newMat
@@ -112,10 +124,22 @@ for obj in objects where obj.material != undefined do (
 messageBox "材质转换完成！" title:"操作成功"
 
 -- 删除未被引用的材质
-for mat in scenematerials do (
-    if (refs.dependentNodes mat).count == 0 do (
-        deleteItem scenematerials (findItem scenematerials mat)
+-- for mat in scenematerials do (
+--     if (refs.dependentNodes mat).count == 0 do (
+--         deleteItem scenematerials (findItem scenematerials mat)
+--     )
+-- )
+
+-- 清理旧材质名称对应的材质
+for oldName in oldMaterialNames do (
+    for mat in scenematerials do (
+        if mat.name == oldName do (
+            deleteItem scenematerials (findItem scenematerials mat)
+        )
     )
 )
 
-messageBox "材质转换完成！" title:"操作成功"
+-- 清空旧材质名称数组
+oldMaterialNames = #()
+
+messageBox "未使用材质已清理！" title:"操作成功"

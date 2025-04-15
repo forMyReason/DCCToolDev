@@ -141,6 +141,8 @@ fn convertToStandard = (
 fn deleteMaterialSingle = (
     -- 删除未被引用的材质
     for mat in scenematerials do (
+        -- scenematerials包含场景所有材质的集合
+        -- refs.dependentNodes mat 返回的是与材质 mat 相关联的所有场景节点（例如几何体、灯光等）
         if (refs.dependentNodes mat).count == 0 do (
             deleteItem scenematerials (findItem scenematerials mat)
         )

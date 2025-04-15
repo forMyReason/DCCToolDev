@@ -46,7 +46,7 @@ fn convertToStandardMaterial mat = (
         default: (
             -- 创建新标准材质
             newMat = StandardMaterial()
-            newMat.name = mat.name + "_Std"
+            newMat.name = mat.name
             
             -- 漫反射处理（优先处理贴图）
             case (classof mat) of (
